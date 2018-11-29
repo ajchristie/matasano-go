@@ -6,6 +6,7 @@ import (
   "encoding/base64"
   "strings"
   "math"
+  "sort"
 )
 
 func main() {
@@ -80,21 +81,39 @@ type Result struct {
   xord string
 }
 
+type Result2 struct {
+  fscore float32
+  bscore float32
+  shift int
+  xord string
+}
+
+func Less(r, s Result) bool {
+  return r.score < s.score
+}
+
+func freqLess(r, s Result2) bool {
+  return r.fscore < s.fscore
+}
+
+func basicComp(r, s Result2) bool {
+  return r.bscore > s.bscore
+}
+
 func BreakCaesar(s string) string { // s comes in hex encoded...
   decoded := hex.DecodeString(s)
-  results := new([]Result) // is this ok?
-  var i int = 1
+  results := make([]Result, 255)
   var minScore float32 = 1000.0
-  var best Result = new(Result)
-  for i < 256 {
-    shifted := new([]byte, len(decoded))
+  var best Result
+  for i:= 1; i < 256; i++ {
+    shifted := make([]byte, len(decoded))
     score := 0.0
     for j := range decoded {
       shifted[j] = i ^ decoded[j]
     }
     score = FrequencyScore(shifted)
     result := Result{score, i, shifted}
-    append(results, result)
+    results[i-1] = result
     if score < minScore {
       minScore = score
       best = result
@@ -104,3 +123,28 @@ return string(best.xord)
 }
 
 // for challenge 4
+func FindCaesar(l []string) Result2 {
+  results := make([]Result2, len(l)*255)
+  for k, ctext := range l {
+    decoded := hex.DecodeString(ctext)
+    for i := 1; i < 256; i++ {
+      xord := make([]byte, len(decoded))
+      for j, b := range decoded {
+        xord[j] = i ^ b
+      }
+      freqScore := FrequencyScore(xord)
+      bScore := BasicScore(xord)
+      results[k + i-1] = Result2{freqScore, bScore, i, xord}
+    }
+  }
+  sort.SliceStable(results, freqLess)
+  sort.SliceStable(results, basicComp)
+  return result[0]
+}
+
+// for challenge 5
+func Vigenere(ptext []byte, key string) []byte {
+  keylength = len(key)
+  // ok, now you need to make your piece with strings here and ensure everything will
+  // convert cleanly to byteslices
+}
