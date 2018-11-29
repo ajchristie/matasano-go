@@ -88,6 +88,8 @@ type Result2 struct {
   xord string
 }
 
+// actually do an interface for sorting results
+
 func Less(r, s Result) bool {
   return r.score < s.score
 }
@@ -144,7 +146,30 @@ func FindCaesar(l []string) Result2 {
 
 // for challenge 5
 func Vigenere(ptext []byte, key string) []byte {
-  keylength = len(key)
-  // ok, now you need to make your piece with strings here and ensure everything will
-  // convert cleanly to byteslices
+  keybytes := []bytes(key)
+  keylength := len(keybytes)
+  out := make([]bytes, len(ptext))
+  for i := range ptext {
+    out[i] = ptext[i] ^ keybytes[i % keylength]
+  }
+  return out
+}
+
+// for challenge 6
+func HammingDistance(a,b []byte) int { // assuming a and b have the same length
+    var count int
+    for i := range a {
+      xor := a[i] ^ b[i]
+      count += strings.Count(fmt.Sprintf("%b", xor), "1")
+    }
+    return count
+}
+
+func MakeSegments(s []bytes, n int) [][]bytes {
+  segNumber := len(s) / n
+  segments := make([][]bytes, segNumber)
+  for i := 0; i < n; i++ {
+    segments[i] = s[i:i+n]
+  }
+  return segments
 }
