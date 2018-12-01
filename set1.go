@@ -49,7 +49,7 @@ func IsASCII(b byte) bool {
 
 func BasicScore(s []byte) float32 {
   filtered := Filter(s, IsASCII)
-  score := float32(len(filtered)) / float32(len(s))
+  score := float32(len(filtered)) / len(s)
   return score
 }
 
@@ -75,37 +75,33 @@ func FrequencyScore(s []byte) float32 {
   return delta
 }
 
+// a type to hold sort scores when detecting and breaking Caesar-enciphered texts
 type Result struct {
-  score float32
-  shift int
-  xord string
-}
-
-type Result2 struct {
   fscore float32
   bscore float32
   shift int
   xord string
 }
 
-// actually do an interface for sorting results
+// sort.Interface signature for Result slices
+type byScore []Result
 
-func Less(r, s Result) bool {
-  return r.score < s.score
+func (r byScore) len() int {
+  return len(r)
 }
 
-func freqLess(r, s Result2) bool {
-  return r.fscore < s.fscore
+func (r byScore) Swap(i, j int) {
+  r[i], r[j] = r[j], r[i]
 }
 
-func basicComp(r, s Result2) bool {
-  return r.bscore > s.bscore
+func (r byScore) Less(i, j int) bool { // BasicScore is dominant key for sort
+  return (r[i].fscore <= r[j].fscore) && (r[i].bscore > r[j].bscore)
 }
 
 func BreakCaesar(s string) string { // s comes in hex encoded...
   decoded := hex.DecodeString(s)
   results := make([]Result, 255)
-  var minScore float32 = 1000.0
+  var minScore float32 = 1000.0 // only using FrequencyScore here
   var best Result
   for i:= 1; i < 256; i++ {
     shifted := make([]byte, len(decoded))
@@ -113,11 +109,12 @@ func BreakCaesar(s string) string { // s comes in hex encoded...
     for j := range decoded {
       shifted[j] = i ^ decoded[j]
     }
-    score = FrequencyScore(shifted)
-    result := Result{score, i, shifted}
+    freqScore = FrequencyScore(shifted)
+    bScore = BasicScore(shifted)
+    result := Result{fscore, bscore, i, shifted}
     results[i-1] = result
-    if score < minScore {
-      minScore = score
+    if freqScore < minScore {
+      minScore = freqScore
       best = result
     }
   }
@@ -139,8 +136,7 @@ func FindCaesar(l []string) Result2 {
       results[k + i-1] = Result2{freqScore, bScore, i, xord}
     }
   }
-  sort.SliceStable(results, freqLess)
-  sort.SliceStable(results, basicComp)
+  sort.SliceStable(results)
   return result[0]
 }
 
@@ -172,4 +168,28 @@ func MakeSegments(s []bytes, n int) [][]bytes {
     segments[i] = s[i:i+n]
   }
   return segments
+}
+
+func FindKeyLength(ct []byte) int {
+  var minIndex int = 1000
+  var guess int = 40 // maximum 'plausible' key length; this could be a parameter
+  for keylength := 2; keylength < 41; keylength++ {
+    segs := MakeSegments(ct, keylength)
+    var roundMinIndex int = 150
+    for i := 0; i < len(segs); i++ {
+      for j := i+1; j < len(segs); j++ {
+        index := float32(HammingDistance(segs[i], segs[j])) / keylength
+        if index == 0.0 {
+          continue
+        } else if index < roundMinIndex {
+          roundMinIndex = index
+        }
+      }
+    }
+    if roundMinIndex < minIndex {
+      minIndex = roundMinIndex
+      guess = keylength
+    }
+  }
+  return guess
 }
