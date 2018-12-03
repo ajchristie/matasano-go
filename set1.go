@@ -2,11 +2,13 @@ package main
 
 import (
   "fmt"
+  "ioutil"
   "encoding/hex"
   "encoding/base64"
   "strings"
   "math"
   "sort"
+  "crypto/aes"
 )
 
 func main() {
@@ -98,11 +100,11 @@ func (r byScore) Less(i, j int) bool { // BasicScore is dominant key for sort
   return (r[i].fscore <= r[j].fscore) && (r[i].bscore > r[j].bscore)
 }
 
-func BreakCaesar(s string) string { // s comes in hex encoded...
+func BreakCaesar(s string) (int, string) { // s comes in hex encoded...
   decoded := hex.DecodeString(s)
   results := make([]Result, 255)
   var minScore float32 = 1000.0 // only using FrequencyScore here
-  var best Result
+  best = make(Result)
   for i:= 1; i < 256; i++ {
     shifted := make([]byte, len(decoded))
     score := 0.0
@@ -118,11 +120,11 @@ func BreakCaesar(s string) string { // s comes in hex encoded...
       best = result
     }
   }
-return string(best.xord)
+return best.shift, string(best.xord)
 }
 
 // for challenge 4
-func FindCaesar(l []string) Result2 {
+func FindCaesar(l []string) Result {
   results := make([]Result2, len(l)*255)
   for k, ctext := range l {
     decoded := hex.DecodeString(ctext)
@@ -136,8 +138,8 @@ func FindCaesar(l []string) Result2 {
       results[k + i-1] = Result2{freqScore, bScore, i, xord}
     }
   }
-  sort.SliceStable(results)
-  return result[0]
+  sort.SliceStable(byScore(results))
+  return results[0]
 }
 
 // for challenge 5
@@ -172,7 +174,7 @@ func MakeSegments(s []bytes, n int) [][]bytes {
 
 func FindKeyLength(ct []byte) int {
   var minIndex int = 1000
-  var guess int = 40 // maximum 'plausible' key length; this could be a parameter
+  var guess int
   for keylength := 2; keylength < 41; keylength++ {
     segs := MakeSegments(ct, keylength)
     var roundMinIndex int = 150
@@ -192,4 +194,80 @@ func FindKeyLength(ct []byte) int {
     }
   }
   return guess
+}
+
+func BreakVigenere(ct []byte) (string, string) {
+  keylength := FindKeyLength(ct)
+  numBlocks := len(ct) / keylength
+  padLength := (keylength - (len(ct) % keylength)) % keylength
+  for i := 0; i < padLength; i++ {
+    append(ct, byte(padLength))
+  }
+  rows := MakeSegments(ct, keylength)
+  shifts := make([]byte, keylength)
+  for i := 0; i < keylength; i++ {
+    column := make([]byte, len(rows))
+    for j, row := range rows {
+      column[j] = row[i]
+    }
+    shifts[i], _ := BreakCaesar(hex.EncodeToString(column))
+  }
+  key := string(shifts)
+  decryption := string(Vigenere(ct, key))
+  return key, decryption
+}
+
+func LoadCT(path string) string {
+  dat, err := ioutil.ReadFile(path)
+  if err != nil {
+    panic(err)
+  }
+  return string(dat)
+}
+
+// for challenge 7
+func AES128ECBenc(intext, key, []byte, which string) []byte {
+  cipher, err := aes.NewCipher(key)
+  if err != nil {
+    panic(err)
+  }
+  if (len(intext) % aes.BlockSize) != 0 {
+    panic("Failure: Input not a multiple of BlockSize.")
+  }
+  var blocks int = len(intext) / aes.BlockSize
+  outtext := make([]byte, len(text))
+  if which == "e" {
+    op : = cipher.Encrypt
+  } else if which == "d" {
+    op := cipher.Decrypt
+  } else {
+    panic("Failure: Encrypt/Decrypt mode undetermined. Last argument must be e or d.")
+  }
+  for i := 0; i < blocks; i++ {
+    outtext[aes.BlockSize*i:aes.BlockSize*(i+1)] = op(intext[aes.BlockSize*i:])
+  }
+  return outtext
+}
+
+// for challenge 8
+// NB: I wasn't in the mood to implement another results type and keep a ranked list, which is
+// obviously the smart move here. But I know from a previous attempt this will work, so TS
+func Catch128ECB(ctexts [][]byte) []byte {
+  var maxReps int = 0
+  var candidate []byte
+  for i, ctext := range ctexts {
+    segs := MakeSegments(ctext, 16)
+    counter := make(map[string]int)
+    for j, seg := range segs {
+      k := string(seg)
+      counter[k] += 1
+    }
+    for _, value := range counter {
+      if value > maxReps {
+        maxReps = value
+        candidate = ctext
+      }
+    }
+  }
+  return candidate
 }
