@@ -226,7 +226,7 @@ func LoadCT(path string) string {
 }
 
 // for challenge 7
-func AES128ECBenc(intext, key, []byte, which string) []byte {
+func AES128ECB(intext, key, []byte, which string) []byte {
   cipher, err := aes.NewCipher(key)
   if err != nil {
     panic(err)
