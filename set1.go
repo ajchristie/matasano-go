@@ -125,7 +125,7 @@ return best.shift, string(best.xord)
 
 // for challenge 4
 func FindCaesar(l []string) Result {
-  results := make([]Result2, len(l)*255)
+  results := make([]Result, len(l)*255)
   for k, ctext := range l {
     decoded := hex.DecodeString(ctext)
     for i := 1; i < 256; i++ {
@@ -135,7 +135,7 @@ func FindCaesar(l []string) Result {
       }
       freqScore := FrequencyScore(xord)
       bScore := BasicScore(xord)
-      results[k + i-1] = Result2{freqScore, bScore, i, xord}
+      results[k + i-1] = Result{freqScore, bScore, i, xord}
     }
   }
   sort.SliceStable(byScore(results))
@@ -232,7 +232,7 @@ func AES128ECB(intext, key, []byte, which string) []byte {
     panic(err)
   }
   if (len(intext) % aes.BlockSize) != 0 {
-    panic("Failure: Input not a multiple of BlockSize.")
+    panic("Failure: Input not a multiple of BlockSize")
   }
   var blocks int = len(intext) / aes.BlockSize
   outtext := make([]byte, len(text))
@@ -241,7 +241,7 @@ func AES128ECB(intext, key, []byte, which string) []byte {
   } else if which == "d" {
     op := cipher.Decrypt
   } else {
-    panic("Failure: Encrypt/Decrypt mode undetermined. Last argument must be e or d.")
+    panic("Failure: Encrypt/Decrypt mode unspecified. Last argument must be 'e' or 'd'")
   }
   for i := 0; i < blocks; i++ {
     outtext[aes.BlockSize*i:aes.BlockSize*(i+1)] = op(intext[aes.BlockSize*i:])
